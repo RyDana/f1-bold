@@ -9,13 +9,22 @@ import {
   GradientPluginBundle,
   GradientBladeParams,
 } from 'tweakpane-plugin-gradient';
+import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
 import { TileGenerator } from './TileGenerator';
+import { TileMaterial } from './TileMaterial';
 
-const defaultSettings = {};
+const defaultSettings = {
+  uGradientTexture: [
+    { time: 0, value: { r: 0, g: 0, b: 0, a: 1 } },
+    { time: 1.0, value: { r: 255, g: 255, b: 255, a: 1 } },
+  ],
+  iterationRange: { min: 1, max: 5 },
+  divisionRange: { min: 10, max: 15 },
+};
 
-export type MatUniforms = typeof defaultSettings;
-export type RemappedMatUniforms = {
-  [K in keyof MatUniforms]: { value: MatUniforms[K] };
+export type Params = typeof defaultSettings;
+export type RemappedParams = {
+  [K in keyof Params]: { value: Params[K] };
 };
 
 const parameters = autoSaveToLocalStorage('parameters', {
@@ -27,7 +36,7 @@ export default class MainScene {
   private camera: THREE.Camera;
   private scene: THREE.Scene;
   private aspectRatio: number = 1;
-  private mesh: RibbedGlass;
+  private mesh: THREE.Mesh;
   private pane = new Pane();
   tileGenerator: TileGenerator;
 
@@ -36,21 +45,24 @@ export default class MainScene {
     private renderer: THREE.WebGLRenderer // private soundController: SoundController<SoundEvent>,
   ) {
     this.aspectRatio = dimensions.width / dimensions.height;
+    const sceneDimensions = new THREE.Vector2(1 * this.aspectRatio, 1);
     this.camera = new THREE.OrthographicCamera(
-      -0.5 * this.aspectRatio,
-      0.5 * this.aspectRatio,
-      0.5,
-      -0.5,
+      -sceneDimensions.x / 2,
+      sceneDimensions.x / 2,
+      sceneDimensions.y / 2,
+      -sceneDimensions.y / 2,
       -10,
       10
     );
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x000);
+    this.scene.background = new THREE.Color(0xff0000);
 
     //PANE
     this.pane.registerPlugin(GradientPluginBundle);
+    this.pane.registerPlugin(EssentialsPlugin);
     this.pane.addButton({ title: 'Reset settings' }).on('click', () => {
       localStorage.removeItem('parameters');
+      //@ts-ignore
       window.location = window.location;
       Object.assign(parameters, defaultSettings);
     });
@@ -78,6 +90,7 @@ export default class MainScene {
             const importedSettings = JSON.parse(text);
             Object.assign(parameters, importedSettings);
             localStorage.setItem('parameters', JSON.stringify(parameters));
+            //@ts-ignore
             window.location = window.location;
             this.pane.refresh();
           } catch (error) {
@@ -89,18 +102,60 @@ export default class MainScene {
       input.click();
     });
 
-    this.tileGenerator = new TileGenerator(
-      Math.floor(20 * this.aspectRatio),
-      20,
-      1 * this.aspectRatio,
-      1
-    );
-    this.mesh = this.tileGenerator.getTileMesh();
-    this.mesh.scale.set(2, 2, 1);
+    this.tileGenerator = new TileGenerator(sceneDimensions, parameters);
+    this.mesh = this.tileGenerator.getTileMesh(parameters);
     this.scene.add(this.mesh);
+
+    //Settings
+    const api = this.pane.addBlade({
+      view: 'gradient',
+      initialPoints: parameters.uGradientTexture,
+      label: 'Gradient',
+      colorPicker: true,
+      colorPickerProps: {
+        alpha: true,
+        layout: 'popup',
+        expanded: false,
+      },
+      alphaPicker: false,
+      timePicker: false,
+      timeStep: 0.001,
+      timeDecimalPrecision: 4,
+    }) as GradientBladeApi;
+    api.on('change', (ev) => {
+      parameters.uGradientTexture = ev.value.points;
+      (this.mesh.material as TileMaterial).setGradient(ev.value.points);
+      (this.mesh.material as TileMaterial).needsUpdate = true;
+    });
+
+    this.pane
+      .addBinding(parameters, 'iterationRange', {
+        min: 0,
+        max: 30,
+        step: 1,
+      })
+      .on('change', (ev) => {
+        this.scene.remove(this.mesh);
+        this.mesh = this.tileGenerator.getTileMesh(parameters);
+        this.scene.add(this.mesh);
+      });
+
+    this.pane
+      .addBinding(parameters, 'divisionRange', {
+        min: 0,
+        max: 30,
+        step: 1,
+      })
+      .on('change', (ev) => {
+        this.scene.remove(this.mesh);
+        this.mesh = this.tileGenerator.getTileMesh(parameters);
+        this.scene.add(this.mesh);
+      });
   }
 
-  public update() {}
+  public update() {
+    this.tileGenerator.update();
+  }
 
   public render() {
     this.renderer.render(this.scene, this.camera);

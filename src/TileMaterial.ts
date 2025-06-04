@@ -47,8 +47,10 @@ export class TileMaterial extends THREE.ShaderMaterial {
                 // col -= smoothstep(0., 0.7, max(0., length(uv - vec2(sin(uTime * vNucPos.x) * 0.5 + 0.5, sin(uTime * vNucPos.y) * 0.5 + 0.5)) - 0.2) * 0.9);
                 
                 float time = sin(uTime * 0.05 + vNucPos.x) * 10.0;
-                float xMod = (mod(uv.x * uGradientDivisions + time * 0.4 /* * vNucPos.x*/ , 1.0) - 0.) * step(0.5, vInverted);
-                float yMod = (mod(uv.y * uGradientDivisions + time * 0.4 /* * vNucPos.y*/, 1.0) - 0.) * (1.0 - step(0.5, vInverted));
+                float xDir = uv.x * step(0.75, vInverted) + (1.0 - uv.x) * (1.0 - step(0.75, vInverted));
+                float yDir = uv.y * step(0.25, vInverted) + (1.0 - uv.y) * (1.0 - step(0.25, vInverted));
+                float xMod = (mod(xDir * uGradientDivisions + time * 0.4 /* * vNucPos.x*/ , 1.0) - 0.) * step(0.5, vInverted);
+                float yMod = (mod(yDir * uGradientDivisions + time * 0.4 /* * vNucPos.y*/, 1.0) - 0.) * (1.0 - step(0.5, vInverted));
                 col -= abs(sin((xMod + yMod))); //sin((xMod + yMod) * 3.14159 ) * 0.5 + 0.5;
 
                 col *= pow(1.0 - smoothstep(vignetteSize, 0., uv.x), power);
@@ -71,7 +73,7 @@ export class TileMaterial extends THREE.ShaderMaterial {
         uGradientTexture: {
           value: createGradientTexture(parameters.uGradientTexture),
         },
-        uGradientDivisions: { value: randomCandidate([1, 2, 3]) },
+        uGradientDivisions: { value: parameters.uGradientDivisions }, //randomCandidate([0.1, 0.5, 1, 2, 3]) },
       },
     });
   }
@@ -87,5 +89,9 @@ export class TileMaterial extends THREE.ShaderMaterial {
     }[]
   ) {
     this.uniforms.uGradientTexture.value = createGradientTexture(GradientStops);
+  }
+
+  public setGradientDivisions(divisions: number) {
+    this.uniforms.uGradientDivisions.value = divisions;
   }
 }

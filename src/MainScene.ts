@@ -15,15 +15,17 @@ import { TileMaterial } from './TileMaterial';
 
 const defaultSettings = {
   uGradientTexture: [
-    { time: 0.343, value: { r: 0, g: 0, b: 0, a: 1 } },
+    { time: 0.0, value: { r: 0, g: 0, b: 0, a: 1 } },
     { time: 0.808, value: { r: 0, g: 0, b: 255, a: 1 } },
     {
       time: 1,
       value: { r: 108, g: 204, b: 204, a: 1 },
     },
   ],
-  iterationRange: { min: 1, max: 5 },
-  divisionRange: { min: 10, max: 15 },
+  uGradientDivisions: 1.0,
+  iterationRange: { min: 1, max: 4 },
+  divisionRange: { min: 2, max: 8 },
+  concentricRange: { min: 5, max: 8 },
 };
 
 export type Params = typeof defaultSettings;
@@ -133,6 +135,16 @@ export default class MainScene {
     });
 
     this.pane
+      .addBinding(parameters, 'uGradientDivisions', {
+        min: 0,
+        max: 10,
+      })
+      .on('change', (ev) => {
+        (this.mesh.material as TileMaterial).setGradientDivisions(ev.value);
+        (this.mesh.material as TileMaterial).needsUpdate = true;
+      });
+
+    this.pane
       .addBinding(parameters, 'iterationRange', {
         min: 0,
         max: 30,
@@ -146,6 +158,18 @@ export default class MainScene {
 
     this.pane
       .addBinding(parameters, 'divisionRange', {
+        min: 0,
+        max: 30,
+        step: 1,
+      })
+      .on('change', (ev) => {
+        this.scene.remove(this.mesh);
+        this.mesh = this.tileGenerator.getTileMesh(parameters);
+        this.scene.add(this.mesh);
+      });
+
+    this.pane
+      .addBinding(parameters, 'concentricRange', {
         min: 0,
         max: 30,
         step: 1,

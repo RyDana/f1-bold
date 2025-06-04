@@ -41,7 +41,8 @@ export class TileGenerator {
 
       customTiles = this.generateQuadtreeTiles(
         this.parameters.iterationRange,
-        this.parameters.divisionRange
+        this.parameters.divisionRange,
+        this.parameters.concentricRange
       );
     }
     this.tileMesh = this.createTileMesh(customTiles, parameters);
@@ -194,7 +195,8 @@ export class TileGenerator {
 
   private generateQuadtreeTiles(
     interactionRange: { min: number; max: number },
-    divisionRange: { min: number; max: number }
+    divisionRange: { min: number; max: number },
+    concentricRange: { min: number; max: number }
   ): Tile[] {
     let tiles: LevelledTile[] = [
       {
@@ -217,7 +219,12 @@ export class TileGenerator {
         }
 
         if (chance(0.2) && i > interactionRange.min) {
-          newTiles.push(...this.concentricTile(tile, randomInt(3, 5)));
+          newTiles.push(
+            ...this.concentricTile(
+              tile,
+              randomInt(concentricRange.min, concentricRange.max)
+            )
+          );
           // newTiles.push(tile);
           continue;
         }

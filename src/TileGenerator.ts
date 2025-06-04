@@ -12,6 +12,10 @@ export type Tile = {
   height: number;
 };
 
+type LevelledTile = Tile & {
+  level: number;
+};
+
 export type TileMesh = THREE.InstancedMesh<
   THREE.PlaneGeometry,
   THREE.ShaderMaterial
@@ -192,9 +196,6 @@ export class TileGenerator {
     interactionRange: { min: number; max: number },
     divisionRange: { min: number; max: number }
   ): Tile[] {
-    type LevelledTile = Tile & {
-      level: number;
-    };
     let tiles: LevelledTile[] = [
       {
         level: 0,
@@ -216,7 +217,8 @@ export class TileGenerator {
         }
 
         if (chance(0.2) && i > interactionRange.min) {
-          newTiles.push(tile);
+          newTiles.push(...this.concentricTile(tile, randomInt(3, 5)));
+          // newTiles.push(tile);
           continue;
         }
 
@@ -243,6 +245,23 @@ export class TileGenerator {
       tiles = newTiles;
     }
 
+    return tiles;
+  }
+
+  private concentricTile(tile: LevelledTile, number: number): LevelledTile[] {
+    const tiles: LevelledTile[] = [];
+    tiles.push(tile);
+    const step = tile.width / 2 / (number + 1);
+    for (let i = 0; i < number; i++) {
+      const offset = step * (i + 1);
+      tiles.push({
+        level: tile.level,
+        x: tile.x + offset,
+        y: tile.y + offset,
+        width: tile.width - offset * 2,
+        height: tile.height - offset * 2,
+      });
+    }
     return tiles;
   }
 

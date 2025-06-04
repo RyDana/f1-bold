@@ -15,8 +15,12 @@ import { TileMaterial } from './TileMaterial';
 
 const defaultSettings = {
   uGradientTexture: [
-    { time: 0, value: { r: 0, g: 0, b: 0, a: 1 } },
-    { time: 1.0, value: { r: 255, g: 255, b: 255, a: 1 } },
+    { time: 0.343, value: { r: 0, g: 0, b: 0, a: 1 } },
+    { time: 0.808, value: { r: 0, g: 0, b: 255, a: 1 } },
+    {
+      time: 1,
+      value: { r: 108, g: 204, b: 204, a: 1 },
+    },
   ],
   iterationRange: { min: 1, max: 5 },
   divisionRange: { min: 10, max: 15 },

@@ -42,7 +42,7 @@ export class TileMaterial extends THREE.ShaderMaterial {
                 float vignette = smoothstep(0.8, 0.7, length(uv - 0.5));
                 col *= vignette;
                 
-                float vignetteSize = 0.05;
+                float vignetteSize = 0.0;
                 float power = 0.5;
                 // col -= smoothstep(0., 0.7, max(0., length(uv - vec2(sin(uTime * vNucPos.x) * 0.5 + 0.5, sin(uTime * vNucPos.y) * 0.5 + 0.5)) - 0.2) * 0.9);
                 

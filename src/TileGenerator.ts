@@ -5,21 +5,23 @@ import { createGradientTexture } from './utils';
 import { TileMaterial } from './TileMaterial';
 import { Params } from './MainScene';
 
+enum GradientDirection {
+  DOWN = 0.25,
+  UP = 0.0,
+  LEFT = 0.75,
+  RIGHT = 0.5,
+}
+
 export type Tile = {
   x: number;
   y: number;
   width: number;
   height: number;
-};
-
-type LevelledTile = Tile & {
   level: number;
+  direction: GradientDirection;
 };
 
-export type TileMesh = THREE.InstancedMesh<
-  THREE.PlaneGeometry,
-  THREE.ShaderMaterial
->;
+export type TileMesh = THREE.InstancedMesh<THREE.PlaneGeometry, TileMaterial>;
 
 export class TileGenerator {
   private tileMesh: TileMesh;
@@ -34,11 +36,6 @@ export class TileGenerator {
     this.tileMesh?.geometry.dispose();
     this.tileMesh?.material.dispose();
     if (customTiles.length === 0) {
-      // customTiles = this.generateRandomCustomTiles(
-      //   8,
-      //   (8 * this.sceneDimensions.y) / this.sceneDimensions.x
-      // );
-
       customTiles = this.generateQuadtreeTiles(
         this.parameters.iterationRange,
         this.parameters.divisionRange,
@@ -52,7 +49,7 @@ export class TileGenerator {
   private createTileMesh(
     tiles: Tile[],
     parameters: Params
-  ): THREE.InstancedMesh<THREE.PlaneGeometry, THREE.ShaderMaterial> {
+  ): THREE.InstancedMesh<THREE.PlaneGeometry, TileMaterial> {
     const tileCount = tiles.length;
 
     const geometry = new THREE.PlaneGeometry(1, 1);
@@ -81,15 +78,6 @@ export class TileGenerator {
       new THREE.InstancedBufferAttribute(nucPos, 2)
     );
 
-    const inverted = new Float32Array(tileCount);
-    for (let i = 0; i < inverted.length; i += 1) {
-      inverted[i] = Math.random();
-    }
-    geometry.setAttribute(
-      'inverted',
-      new THREE.InstancedBufferAttribute(inverted, 1)
-    );
-
     const instancedMesh = new THREE.InstancedMesh(
       geometry,
       material,
@@ -97,100 +85,30 @@ export class TileGenerator {
     );
     instancedMesh.setColorAt(0, dummyColor);
 
+    const direction = new Float32Array(tileCount);
     let index = 0;
     const dummy = new THREE.Object3D();
     for (const tile of tiles) {
-      const tileWidth = tile.width * this.sceneDimensions.x;
-      const tileHeight = tile.height * this.sceneDimensions.y;
+      const tileWidth = tile.width;
+      const tileHeight = tile.height;
 
-      const tileX =
-        tile.x * this.sceneDimensions.x -
-        this.sceneDimensions.x / 2 +
-        tileWidth / 2;
-      const tileY =
-        tile.y * this.sceneDimensions.y -
-        this.sceneDimensions.y / 2 +
-        tileHeight / 2;
+      direction[index] = tile.direction;
+
+      const tileX = tile.x - this.sceneDimensions.x / 2 + tileWidth / 2;
+      const tileY = tile.y - this.sceneDimensions.y / 2 + tileHeight / 2;
 
       dummy.scale.set(tileWidth, tileHeight, 1);
       dummy.position.set(tileX, tileY, 0);
       dummy.updateMatrix();
       instancedMesh.setMatrixAt(index++, dummy.matrix);
     }
-    return instancedMesh;
-  }
 
-  private generateRandomCustomTiles(
-    subdivisionsX: number,
-    subdivisionsY: number
-  ): Tile[] {
-    const customTiles: Tile[] = [];
-    const tileWidth = 1 / subdivisionsX; // Width of each tile
-    const tileHeight = 1 / subdivisionsY; // Height of each tile
-    const occupied = Array.from({ length: subdivisionsX }, () =>
-      Array(subdivisionsY).fill(false)
+    geometry.setAttribute(
+      'direction',
+      new THREE.InstancedBufferAttribute(direction, 1)
     );
 
-    const randomTileCount = 5; // Random number of custom tiles (1 to 5)
-
-    for (let t = 0; t < randomTileCount; t++) {
-      let width = 0,
-        height = 0,
-        x = 0,
-        y = 0;
-      let valid = false;
-
-      while (!valid) {
-        width = randomCandidate([1, 5]);
-        height = 6 - width;
-        x = randomInt(0, subdivisionsX);
-        y = randomInt(0, subdivisionsY);
-
-        valid = true;
-
-        // Check if the tile fits within the grid and doesn't overlap
-        if (x + width > subdivisionsX || y + height > subdivisionsY) {
-          valid = false;
-          continue;
-        }
-
-        for (let i = x; i < x + width; i++) {
-          for (let j = y; j < y + height; j++) {
-            if (occupied[i][j]) {
-              valid = false;
-              break;
-            }
-          }
-          if (!valid) break;
-        }
-      }
-
-      // Mark the area as occupied
-      for (let i = x; i < x + width; i++) {
-        for (let j = y; j < y + height; j++) {
-          occupied[i][j] = true;
-        }
-      }
-
-      customTiles.push({
-        x: x * tileWidth,
-        y: y * tileHeight,
-        width: width / subdivisionsX,
-        height: height / subdivisionsY,
-      });
-    }
-
-    // Fill remaining tiles
-    for (let i = 0; i < subdivisionsX; i++) {
-      for (let j = 0; j < subdivisionsY; j++) {
-        if (occupied[i][j]) continue;
-        const x = i / subdivisionsX;
-        const y = j / subdivisionsY;
-        customTiles.push({ x, y, width: tileWidth, height: tileHeight });
-      }
-    }
-
-    return customTiles;
+    return instancedMesh;
   }
 
   private generateQuadtreeTiles(
@@ -198,19 +116,20 @@ export class TileGenerator {
     divisionRange: { min: number; max: number },
     concentricRange: { min: number; max: number }
   ): Tile[] {
-    let tiles: LevelledTile[] = [
+    let tiles: Tile[] = [
       {
+        direction: GradientDirection.UP,
         level: 0,
         x: 0,
         y: 0,
-        width: 1,
-        height: 1,
+        width: this.sceneDimensions.x,
+        height: this.sceneDimensions.y,
       },
     ];
 
     for (let i = 1; i <= interactionRange.max; i++) {
       //split the tile vertically or horizontally
-      const newTiles: LevelledTile[] = [];
+      const newTiles: Tile[] = [];
       for (let j = 0; j < tiles.length; j++) {
         const tile = tiles[j];
         if (tile.level !== i - 1) {
@@ -239,12 +158,23 @@ export class TileGenerator {
         tile[direction] = newTileDim;
         tile.level = i;
         for (let k = 0; k < divisions; k++) {
-          const newTile: LevelledTile = {
+          const width = direction === 'width' ? newTileDim : tile.width;
+          const height = direction === 'height' ? newTileDim : tile.height;
+          const dir =
+            width > height
+              ? randomCandidate([
+                  GradientDirection.RIGHT,
+                  GradientDirection.LEFT,
+                ])
+              : randomCandidate([GradientDirection.DOWN, GradientDirection.UP]);
+
+          const newTile: Tile = {
+            direction: dir,
             level: i,
             x: tile.x + (direction === 'width' ? newTileDim * k : 0),
             y: tile.y + (direction === 'height' ? newTileDim * k : 0),
-            width: direction === 'width' ? newTileDim : tile.width,
-            height: direction === 'height' ? newTileDim : tile.height,
+            width,
+            height,
           };
           newTiles.push(newTile);
         }
@@ -255,25 +185,31 @@ export class TileGenerator {
     return tiles;
   }
 
-  private concentricTile(tile: LevelledTile, number: number): LevelledTile[] {
-    const tiles: LevelledTile[] = [];
+  private concentricTile(tile: Tile, number: number): Tile[] {
+    const tiles: Tile[] = [];
     tiles.push(tile);
     const step = tile.width / 2 / (number + 1);
     for (let i = 0; i < number; i++) {
       const offset = step * (i + 1);
+      const width = tile.width - offset * 2;
+      const height = tile.height - offset * 2;
+      const direction =
+        width > height
+          ? randomCandidate([GradientDirection.RIGHT, GradientDirection.LEFT])
+          : randomCandidate([GradientDirection.DOWN, GradientDirection.UP]);
       tiles.push({
+        direction,
         level: tile.level,
         x: tile.x + offset,
         y: tile.y + offset,
-        width: tile.width - offset * 2,
-        height: tile.height - offset * 2,
+        width,
+        height,
       });
     }
     return tiles;
   }
 
   public update(): void {
-    this.tileMesh.material.uniforms.uTime.value = (Date.now() / 100) % 1000;
-    this.tileMesh.material.needsUpdate = true;
+    this.tileMesh.material.update();
   }
 }

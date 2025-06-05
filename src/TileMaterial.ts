@@ -11,17 +11,17 @@ export class TileMaterial extends THREE.ShaderMaterial {
             varying vec3 vColor;
             varying vec2 vUv;
             varying vec2 vNucPos;
-            varying float vInverted;
+            varying float vDirection;
     
             attribute vec2 nucPos;
-            attribute float inverted;
+            attribute float direction;
     
             void main() {
     
               vUv = uv;
               vColor = instanceColor;
               vNucPos = nucPos;
-              vInverted = inverted;
+              vDirection = direction;
               gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
             }
           `,
@@ -29,11 +29,14 @@ export class TileMaterial extends THREE.ShaderMaterial {
             varying vec3 vColor;
             varying vec2 vUv;
             varying vec2 vNucPos;
-            varying float vInverted;
+            varying float vDirection;
     
             uniform float uTime;
             uniform sampler2D uGradientTexture;
             uniform float uGradientDivisions;
+            uniform float uVignetteSize;
+            uniform float uSpeed;
+            uniform float uAsync;
     
     
             void main() {
@@ -42,29 +45,28 @@ export class TileMaterial extends THREE.ShaderMaterial {
                 float vignette = smoothstep(0.8, 0.7, length(uv - 0.5));
                 col *= vignette;
                 
-                float vignetteSize = 0.0;
+                float vignetteSize = uVignetteSize;
                 float power = 0.5;
                 // col -= smoothstep(0., 0.7, max(0., length(uv - vec2(sin(uTime * vNucPos.x) * 0.5 + 0.5, sin(uTime * vNucPos.y) * 0.5 + 0.5)) - 0.2) * 0.9);
                 
-                float time = sin(uTime * 0.05 + vNucPos.x) * 10.0;
-                float xDir = uv.x * step(0.75, vInverted) + (1.0 - uv.x) * (1.0 - step(0.75, vInverted));
-                float yDir = uv.y * step(0.25, vInverted) + (1.0 - uv.y) * (1.0 - step(0.25, vInverted));
-                float xMod = (mod(xDir * uGradientDivisions + time * 0.4 /* * vNucPos.x*/ , 1.0) - 0.) * step(0.5, vInverted);
-                float yMod = (mod(yDir * uGradientDivisions + time * 0.4 /* * vNucPos.y*/, 1.0) - 0.) * (1.0 - step(0.5, vInverted));
-                col -= abs(sin((xMod + yMod))); //sin((xMod + yMod) * 3.14159 ) * 0.5 + 0.5;
+                float time = uTime * uSpeed + vNucPos.x * uAsync; //sin(uTime * 0.05 + vNucPos.x) * 10.0;
+                float xDir = uv.x * step(0.75, vDirection) + (1.0 - uv.x) * (1.0 - step(0.75, vDirection));
+                float yDir = uv.y * step(0.25, vDirection) + (1.0 - uv.y) * (1.0 - step(0.25, vDirection));
+                float xMod = (mod(xDir * uGradientDivisions + time, 1.0)) * step(0.5, vDirection);
+                float yMod = (mod(yDir * uGradientDivisions + time, 1.0)) * (1.0 - step(0.5, vDirection));
+                col -= (xMod + yMod); //sin((xMod + yMod) * 3.14159 ) * 0.5 + 0.5;
 
                 col *= pow(1.0 - smoothstep(vignetteSize, 0., uv.x), power);
                 col *= pow(1.0 - smoothstep(1.0 - vignetteSize, 1.0, uv.x), power);
                 col *= pow(1.0 - smoothstep(vignetteSize, 0., uv.y), power);
                 col *= pow(1.0 - smoothstep(1.0 - vignetteSize, 1.0, uv.y), power);
-                // if(vInverted > 0.5) {
-                //   col = vec3(1.0) - col;
-                // }
-    
+
                 vec3 gradientColor = texture(uGradientTexture, vec2(col.r, 0.5)).rgb;
                 col = gradientColor; 
     
+                gl_FragColor = vec4(vec3(uv.x) * step(0.5, uv.y) + vec3(xMod) * (1.0 - step(0.5, uv.y)), 1.0);
                 gl_FragColor = vec4(col, 1.0);
+
             }
           `,
       side: THREE.DoubleSide,
@@ -73,13 +75,17 @@ export class TileMaterial extends THREE.ShaderMaterial {
         uGradientTexture: {
           value: createGradientTexture(parameters.uGradientTexture),
         },
-        uGradientDivisions: { value: parameters.uGradientDivisions }, //randomCandidate([0.1, 0.5, 1, 2, 3]) },
+        uGradientDivisions: { value: parameters.uGradientDivisions },
+        uVignetteSize: { value: parameters.uVignetteSize },
+        uSpeed: { value: parameters.uSpeed },
+        uAsync: { value: parameters.uAsync },
       },
     });
   }
 
-  public update(time: number) {
-    this.uniforms.uTime.value = time;
+  public update() {
+    this.uniforms.uTime.value = (Date.now() / 1000) % 1000;
+    this.needsUpdate = true;
   }
 
   public setGradient(
@@ -89,9 +95,25 @@ export class TileMaterial extends THREE.ShaderMaterial {
     }[]
   ) {
     this.uniforms.uGradientTexture.value = createGradientTexture(GradientStops);
+    this.needsUpdate = true;
   }
 
   public setGradientDivisions(divisions: number) {
     this.uniforms.uGradientDivisions.value = divisions;
+    this.needsUpdate = true;
+  }
+
+  public setVignetteSize(size: number) {
+    this.uniforms.uVignetteSize.value = size;
+    this.needsUpdate = true;
+  }
+
+  public setSpeed(speed: number) {
+    this.uniforms.uSpeed.value = speed;
+    this.needsUpdate = true;
+  }
+  public setAsync(async: number) {
+    this.uniforms.uAsync.value = async;
+    this.needsUpdate = true;
   }
 }

@@ -23,6 +23,9 @@ const defaultSettings = {
     },
   ],
   uGradientDivisions: 1.0,
+  uVignetteSize: 0.1,
+  uSpeed: 0.1,
+  uAsync: 0.0,
   iterationRange: { min: 1, max: 4 },
   divisionRange: { min: 2, max: 8 },
   concentricRange: { min: 5, max: 8 },
@@ -131,21 +134,49 @@ export default class MainScene {
     api.on('change', (ev) => {
       parameters.uGradientTexture = ev.value.points;
       (this.mesh.material as TileMaterial).setGradient(ev.value.points);
-      (this.mesh.material as TileMaterial).needsUpdate = true;
     });
 
     this.pane
       .addBinding(parameters, 'uGradientDivisions', {
+        label: 'Gradient Divisions',
         min: 0,
         max: 10,
       })
       .on('change', (ev) => {
         (this.mesh.material as TileMaterial).setGradientDivisions(ev.value);
-        (this.mesh.material as TileMaterial).needsUpdate = true;
+      });
+    this.pane
+      .addBinding(parameters, 'uVignetteSize', {
+        label: 'Vignette Size',
+        min: 0,
+        max: 1,
+      })
+      .on('change', (ev) => {
+        (this.mesh.material as TileMaterial).setVignetteSize(ev.value);
+      });
+    this.pane
+      .addBinding(parameters, 'uSpeed', {
+        label: 'Gradient Speed',
+        min: 0,
+        max: 10,
+      })
+      .on('change', (ev) => {
+        (this.mesh.material as TileMaterial).setSpeed(ev.value);
+      });
+
+    this.pane
+      .addBinding(parameters, 'uAsync', {
+        label: 'Gradient Synchronization',
+        min: 0,
+        max: 10,
+      })
+      .on('change', (ev) => {
+        (this.mesh.material as TileMaterial).setAsync(ev.value);
       });
 
     this.pane
       .addBinding(parameters, 'iterationRange', {
+        label: 'Iteration Range',
         min: 0,
         max: 30,
         step: 1,
@@ -158,6 +189,7 @@ export default class MainScene {
 
     this.pane
       .addBinding(parameters, 'divisionRange', {
+        label: 'Division Range',
         min: 0,
         max: 30,
         step: 1,
@@ -170,6 +202,7 @@ export default class MainScene {
 
     this.pane
       .addBinding(parameters, 'concentricRange', {
+        label: 'Concentric Range',
         min: 0,
         max: 30,
         step: 1,

@@ -36,7 +36,8 @@ export class TileMaterial extends THREE.ShaderMaterial {
             uniform float uGradientDivisions;
             uniform float uVignetteSize;
             uniform float uSpeed;
-            uniform float uAsync;
+            uniform float uAsyncPos;
+            uniform float uAsyncSpeed;
     
     
             void main() {
@@ -49,7 +50,7 @@ export class TileMaterial extends THREE.ShaderMaterial {
                 float power = 0.5;
                 // col -= smoothstep(0., 0.7, max(0., length(uv - vec2(sin(uTime * vNucPos.x) * 0.5 + 0.5, sin(uTime * vNucPos.y) * 0.5 + 0.5)) - 0.2) * 0.9);
                 
-                float time = uTime * uSpeed + vNucPos.x * uAsync; //sin(uTime * 0.05 + vNucPos.x) * 10.0;
+                float time = uTime * uSpeed * (1. + (vNucPos.y * uAsyncSpeed)) + vNucPos.x * uAsyncPos; //sin(uTime * 0.05 + vNucPos.x) * 10.0;
                 float xDir = uv.x * step(0.75, vDirection) + (1.0 - uv.x) * (1.0 - step(0.75, vDirection));
                 float yDir = uv.y * step(0.25, vDirection) + (1.0 - uv.y) * (1.0 - step(0.25, vDirection));
                 float xMod = (mod(xDir * uGradientDivisions + time, 1.0)) * step(0.5, vDirection);
@@ -78,7 +79,8 @@ export class TileMaterial extends THREE.ShaderMaterial {
         uGradientDivisions: { value: parameters.uGradientDivisions },
         uVignetteSize: { value: parameters.uVignetteSize },
         uSpeed: { value: parameters.uSpeed },
-        uAsync: { value: parameters.uAsync },
+        uAsyncPos: { value: parameters.uAsyncPos },
+        uAsyncSpeed: { value: parameters.uAsyncSpeed },
       },
     });
   }
@@ -112,8 +114,12 @@ export class TileMaterial extends THREE.ShaderMaterial {
     this.uniforms.uSpeed.value = speed;
     this.needsUpdate = true;
   }
-  public setAsync(async: number) {
-    this.uniforms.uAsync.value = async;
+  public setAsyncPos(async: number) {
+    this.uniforms.uAsyncPos.value = async;
+    this.needsUpdate = true;
+  }
+  public setAsyncSpeed(async: number) {
+    this.uniforms.uAsyncSpeed.value = async;
     this.needsUpdate = true;
   }
 }

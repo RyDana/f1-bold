@@ -25,7 +25,8 @@ const defaultSettings = {
   uGradientDivisions: 1.0,
   uVignetteSize: 0.1,
   uSpeed: 0.1,
-  uAsync: 0.0,
+  uAsyncPos: 0.0,
+  uAsyncSpeed: 0.1,
   iterationRange: { min: 1, max: 4 },
   divisionRange: { min: 2, max: 8 },
   concentricRange: { min: 5, max: 8 },
@@ -115,11 +116,16 @@ export default class MainScene {
     this.mesh = this.tileGenerator.getTileMesh(parameters);
     this.scene.add(this.mesh);
 
+    const gradientFolder = this.pane.addFolder({
+      title: 'Gradient Settings',
+      expanded: true,
+    });
+
     //Settings
-    const api = this.pane.addBlade({
+    const api = gradientFolder.addBlade({
       view: 'gradient',
       initialPoints: parameters.uGradientTexture,
-      label: 'Gradient',
+      label: 'Color',
       colorPicker: true,
       colorPickerProps: {
         alpha: true,
@@ -136,27 +142,27 @@ export default class MainScene {
       (this.mesh.material as TileMaterial).setGradient(ev.value.points);
     });
 
-    this.pane
+    gradientFolder
       .addBinding(parameters, 'uGradientDivisions', {
-        label: 'Gradient Divisions',
+        label: 'Divisions',
         min: 0,
         max: 10,
       })
       .on('change', (ev) => {
         (this.mesh.material as TileMaterial).setGradientDivisions(ev.value);
       });
-    this.pane
+    gradientFolder
       .addBinding(parameters, 'uVignetteSize', {
-        label: 'Vignette Size',
+        label: 'Vignette',
         min: 0,
         max: 1,
       })
       .on('change', (ev) => {
         (this.mesh.material as TileMaterial).setVignetteSize(ev.value);
       });
-    this.pane
+    gradientFolder
       .addBinding(parameters, 'uSpeed', {
-        label: 'Gradient Speed',
+        label: 'Speed',
         min: 0,
         max: 10,
       })
@@ -164,17 +170,32 @@ export default class MainScene {
         (this.mesh.material as TileMaterial).setSpeed(ev.value);
       });
 
-    this.pane
-      .addBinding(parameters, 'uAsync', {
-        label: 'Gradient Synchronization',
+    gradientFolder
+      .addBinding(parameters, 'uAsyncPos', {
+        label: 'Sync Position',
         min: 0,
         max: 10,
       })
       .on('change', (ev) => {
-        (this.mesh.material as TileMaterial).setAsync(ev.value);
+        (this.mesh.material as TileMaterial).setAsyncPos(ev.value);
       });
 
-    this.pane
+    gradientFolder
+      .addBinding(parameters, 'uAsyncSpeed', {
+        label: 'Sync Speed',
+        min: 0,
+        max: 10,
+      })
+      .on('change', (ev) => {
+        (this.mesh.material as TileMaterial).setAsyncSpeed(ev.value);
+      });
+
+    const tilingFolder = this.pane.addFolder({
+      title: 'Tiling Settings',
+      expanded: true,
+    });
+
+    tilingFolder
       .addBinding(parameters, 'iterationRange', {
         label: 'Iteration Range',
         min: 0,
@@ -187,7 +208,7 @@ export default class MainScene {
         this.scene.add(this.mesh);
       });
 
-    this.pane
+    tilingFolder
       .addBinding(parameters, 'divisionRange', {
         label: 'Division Range',
         min: 0,
@@ -200,7 +221,7 @@ export default class MainScene {
         this.scene.add(this.mesh);
       });
 
-    this.pane
+    tilingFolder
       .addBinding(parameters, 'concentricRange', {
         label: 'Concentric Range',
         min: 0,

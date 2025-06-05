@@ -1,9 +1,15 @@
-import { chance, randomCandidate, randomInt } from 'ireg-lib/random';
+import {
+  chance,
+  randomCandidate,
+  randomInt,
+  shuffleArray,
+} from 'ireg-lib/random';
 import { glsl } from 'ireg-lib/utils';
 import * as THREE from 'three';
 import { createGradientTexture } from './utils';
 import { TileMaterial } from './TileMaterial';
 import { Params } from './MainScene';
+import { clamp } from 'ireg-lib/math';
 
 enum GradientDirection {
   DOWN = 0.25,
@@ -137,36 +143,159 @@ export class TileGenerator {
           continue;
         }
 
-        if (chance(0.2) && i > interactionRange.min) {
-          newTiles.push(
-            ...this.concentricTile(
-              tile,
-              randomInt(concentricRange.min, concentricRange.max)
-            )
-          );
-          // newTiles.push(tile);
+        if (
+          chance(this.parameters.skipDivisionChance) &&
+          i > interactionRange.min
+        ) {
+          newTiles.push(tile);
           continue;
         }
 
-        //choose direction to split
-        const direction = chance(0.5) ? 'width' : 'height';
-        //chose how many divisions
-        const divisions = randomInt(divisionRange.min, divisionRange.max);
+        if (
+          chance(this.parameters.concentricChance) &&
+          i > interactionRange.min
+        ) {
+          const concentric = this.concentricTile(
+            tile,
+            randomInt(concentricRange.min, concentricRange.max + 1)
+          );
+          if (concentric !== null) {
+            newTiles.push(...concentric);
+            continue;
+          }
+        }
 
-        //create new tile
-        const newTileDim = tile[direction] / divisions;
-        tile[direction] = newTileDim;
-        tile.level = i;
-        for (let k = 0; k < divisions; k++) {
-          const width = direction === 'width' ? newTileDim : tile.width;
-          const height = direction === 'height' ? newTileDim : tile.height;
+        //chose how many divisions
+        const divisions = randomInt(divisionRange.min, divisionRange.max + 1);
+
+        if (
+          chance(this.parameters.unequalThirdsChance) &&
+          divisions === 3 &&
+          i <= 2
+        ) {
+          //choose direction to split
+          const direction = tile.width > tile.height ? 'width' : 'height';
+          const sectionDim = tile[direction] / 4;
+          const newTileDims = [sectionDim, sectionDim * 2, sectionDim];
+
+          let newX = tile.x;
+          let newY = tile.y;
           const dir =
-            width > height
+            tile.width > tile.height
               ? randomCandidate([
                   GradientDirection.RIGHT,
                   GradientDirection.LEFT,
                 ])
               : randomCandidate([GradientDirection.DOWN, GradientDirection.UP]);
+
+          for (let k = 0; k < newTileDims.length; k++) {
+            const width = direction === 'width' ? newTileDims[k] : tile.width;
+            const height =
+              direction === 'height' ? newTileDims[k] : tile.height;
+
+            const newTile: Tile = {
+              direction: dir,
+              level: i,
+              x: newX,
+              y: newY,
+              width,
+              height,
+            };
+            newX += direction === 'width' ? newTileDims[k] : 0;
+            newY += direction === 'height' ? newTileDims[k] : 0;
+            newTiles.push(newTile);
+          }
+          continue;
+        }
+
+        if (
+          chance(this.parameters.unequalHalvesChance) &&
+          divisions === 2 &&
+          i <= 2
+        ) {
+          //choose direction to split
+          const direction = tile.width > tile.height ? 'width' : 'height';
+          const sectionDim = tile[direction] / 3;
+          const newTileDims = shuffleArray([sectionDim, sectionDim * 2]);
+
+          let newX = tile.x;
+          let newY = tile.y;
+
+          let dir = tile.direction;
+
+          for (let k = 0; k < newTileDims.length; k++) {
+            const width = direction === 'width' ? newTileDims[k] : tile.width;
+            const height =
+              direction === 'height' ? newTileDims[k] : tile.height;
+            if (
+              width > height &&
+              [GradientDirection.UP, GradientDirection.DOWN].includes(dir)
+            ) {
+              dir = randomCandidate([
+                GradientDirection.RIGHT,
+                GradientDirection.LEFT,
+              ]);
+            } else if (
+              height > width &&
+              [GradientDirection.LEFT, GradientDirection.RIGHT].includes(dir)
+            ) {
+              dir = randomCandidate([
+                GradientDirection.DOWN,
+                GradientDirection.UP,
+              ]);
+            }
+
+            const newTile: Tile = {
+              direction: dir,
+              level: i,
+              x: newX,
+              y: newY,
+              width,
+              height,
+            };
+            newX += direction === 'width' ? newTileDims[k] : 0;
+            newY += direction === 'height' ? newTileDims[k] : 0;
+            newTiles.push(newTile);
+          }
+          continue;
+        }
+
+        //choose direction to split
+        let direction: 'width' | 'height' = chance(0.5) ? 'width' : 'height';
+
+        //create new tile
+        let newTileDim = tile[direction] / divisions;
+        if (
+          newTileDim <
+          this.sceneDimensions.x * this.parameters.thinnestTileSize
+        ) {
+          direction = direction === 'width' ? 'height' : 'width';
+          newTileDim = tile[direction] / divisions;
+        }
+
+        if (
+          newTileDim <
+          this.sceneDimensions.x * this.parameters.thinnestTileSize
+        ) {
+          newTiles.push(tile);
+          continue;
+        }
+
+        tile[direction] = newTileDim;
+        tile.level = i;
+        const genDir = randomCandidate([
+          GradientDirection.DOWN,
+          GradientDirection.UP,
+        ]);
+        for (let k = 0; k < divisions; k++) {
+          const width = direction === 'width' ? newTileDim : tile.width;
+          const height = direction === 'height' ? newTileDim : tile.height;
+          const dir =
+            width > height
+              ? [GradientDirection.RIGHT, GradientDirection.LEFT][k % 2]
+              : direction === 'height'
+              ? genDir
+              : [GradientDirection.DOWN, GradientDirection.UP][k % 2];
 
           const newTile: Tile = {
             direction: dir,
@@ -185,18 +314,54 @@ export class TileGenerator {
     return tiles;
   }
 
-  private concentricTile(tile: Tile, number: number): Tile[] {
+  private concentricTile(tile: Tile, number: number): Tile[] | null {
     const tiles: Tile[] = [];
     tiles.push(tile);
-    const step = tile.width / 2 / (number + 1);
-    for (let i = 0; i < number; i++) {
+
+    //Try how many concentric tiles could fit
+    let step = 0;
+    let divisions = 0;
+    for (
+      let i = this.parameters.concentricRange.max;
+      i >= this.parameters.concentricRange.min;
+      i--
+    ) {
+      step = Math.min(tile.height, tile.width) / 2 / i;
+      if (step >= this.sceneDimensions.x * this.parameters.thinnestTileSize) {
+        divisions = i;
+        break;
+      }
+    }
+    if (divisions === 0) {
+      return null;
+    }
+
+    // const step =
+    //   (tile.width > tile.height ? tile.height : tile.width) / 2 / (number + 1);
+    // if (step < this.sceneDimensions.x * this.parameters.thinnestTileSize)
+    //   return null;
+
+    const dirFactoryGenerator = randomCandidate([
+      (dirs: GradientDirection[]) => (index: number) =>
+        dirs[index % dirs.length],
+      (dirs: GradientDirection[]) => {
+        const dir = randomCandidate(dirs);
+        return (index: number) => dir;
+      },
+    ]);
+
+    const dirFactory =
+      tile.width > tile.height
+        ? dirFactoryGenerator([GradientDirection.RIGHT, GradientDirection.LEFT])
+        : dirFactoryGenerator([GradientDirection.DOWN, GradientDirection.UP]);
+    tile.direction = dirFactory(1);
+
+    for (let i = 0; i < divisions; i++) {
       const offset = step * (i + 1);
-      const width = tile.width - offset * 2;
-      const height = tile.height - offset * 2;
-      const direction =
-        width > height
-          ? randomCandidate([GradientDirection.RIGHT, GradientDirection.LEFT])
-          : randomCandidate([GradientDirection.DOWN, GradientDirection.UP]);
+      const width = clamp(tile.width - offset * 2, 0, this.sceneDimensions.x);
+      const height = clamp(tile.height - offset * 2, 0, this.sceneDimensions.y);
+      const direction = dirFactory(i);
+
       tiles.push({
         direction,
         level: tile.level,

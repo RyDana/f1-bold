@@ -57,10 +57,12 @@ export class TileMaterial extends THREE.ShaderMaterial {
                 float yMod = (mod(yDir * uGradientDivisions + time, 1.0)) * (1.0 - step(0.5, vDirection));
                 col -= (xMod + yMod); //sin((xMod + yMod) * 3.14159 ) * 0.5 + 0.5;
 
-                col *= pow(1.0 - smoothstep(vignetteSize, 0., uv.x), power);
-                col *= pow(1.0 - smoothstep(1.0 - vignetteSize, 1.0, uv.x), power);
-                col *= pow(1.0 - smoothstep(vignetteSize, 0., uv.y), power);
-                col *= pow(1.0 - smoothstep(1.0 - vignetteSize, 1.0, uv.y), power);
+                if(uVignetteSize > 0.0) {
+                  col *= pow(1.0 - smoothstep(vignetteSize, 0., uv.x), power);
+                  col *= pow(1.0 - smoothstep(1.0 - vignetteSize, 1.0, uv.x), power);
+                  col *= pow(1.0 - smoothstep(vignetteSize, 0., uv.y), power);
+                  col *= pow(1.0 - smoothstep(1.0 - vignetteSize, 1.0, uv.y), power);
+                }
 
                 vec3 gradientColor = texture(uGradientTexture, vec2(col.r, 0.5)).rgb;
                 col = gradientColor; 

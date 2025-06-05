@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 // import SoundController, { SoundEvent } from './SoundController';
 import { autoSaveToLocalStorage, createGradientTexture } from './utils';
-import { Pane } from 'tweakpane';
+import { Pane, TabParams } from 'tweakpane';
 import {
   Gradient,
   GradientBladeApi,
@@ -27,9 +27,14 @@ const defaultSettings = {
   uSpeed: 0.1,
   uAsyncPos: 0.0,
   uAsyncSpeed: 0.1,
+  skipDivisionChance: 0.5,
   iterationRange: { min: 1, max: 4 },
   divisionRange: { min: 2, max: 8 },
   concentricRange: { min: 5, max: 8 },
+  thinnestTileSize: 0.1,
+  unequalThirdsChance: 0.5,
+  unequalHalvesChance: 0.5,
+  concentricChance: 0.5,
 };
 
 export type Params = typeof defaultSettings;
@@ -195,44 +200,95 @@ export default class MainScene {
       expanded: true,
     });
 
+    const rebuildMesh = () => {
+      this.scene.remove(this.mesh);
+      this.mesh = this.tileGenerator.getTileMesh(parameters);
+      this.scene.add(this.mesh);
+    };
+
+    tilingFolder
+      .addBinding(parameters, 'thinnestTileSize', {
+        label: 'Thinnest Tile Size',
+        min: 0,
+        max: 1,
+      })
+      .on('change', rebuildMesh);
+
     tilingFolder
       .addBinding(parameters, 'iterationRange', {
-        label: 'Iteration Range',
+        label: 'Iterations of divisions',
         min: 0,
         max: 30,
         step: 1,
       })
-      .on('change', (ev) => {
-        this.scene.remove(this.mesh);
-        this.mesh = this.tileGenerator.getTileMesh(parameters);
-        this.scene.add(this.mesh);
-      });
+      .on('change', rebuildMesh);
 
-    tilingFolder
+    const tilingTabs = tilingFolder.addTab({
+      pages: [{ title: 'None' }, { title: 'Concentric' }],
+    });
+
+    const tilingTabs2 = tilingFolder.addTab({
+      pages: [{ title: 'Halves' }, { title: 'Thirds' }, { title: 'Even' }],
+    });
+
+    const noneTab = tilingTabs.pages[0];
+    const concentricTab = tilingTabs.pages[1];
+    const unequalHalvesTab = tilingTabs2.pages[0];
+    const unequalThirdsTab = tilingTabs2.pages[1];
+    const evenTab = tilingTabs2.pages[2];
+
+    noneTab
+      .addBinding(parameters, 'skipDivisionChance', {
+        label: 'chance',
+        min: 0,
+        max: 1,
+        step: 0.01,
+      })
+      .on('change', rebuildMesh);
+
+    evenTab
       .addBinding(parameters, 'divisionRange', {
         label: 'Division Range',
         min: 0,
         max: 30,
         step: 1,
       })
-      .on('change', (ev) => {
-        this.scene.remove(this.mesh);
-        this.mesh = this.tileGenerator.getTileMesh(parameters);
-        this.scene.add(this.mesh);
-      });
+      .on('change', rebuildMesh);
 
-    tilingFolder
+    unequalThirdsTab
+      .addBinding(parameters, 'unequalThirdsChance', {
+        label: 'Chance',
+        min: 0,
+        max: 1,
+        step: 0.01,
+      })
+      .on('change', rebuildMesh);
+    unequalHalvesTab
+      .addBinding(parameters, 'unequalHalvesChance', {
+        label: 'Chance',
+        min: 0,
+        max: 1,
+        step: 0.01,
+      })
+      .on('change', rebuildMesh);
+
+    concentricTab
+      .addBinding(parameters, 'concentricChance', {
+        label: 'Chance',
+        min: 0,
+        max: 1,
+        step: 0.01,
+      })
+      .on('change', rebuildMesh);
+
+    concentricTab
       .addBinding(parameters, 'concentricRange', {
         label: 'Concentric Range',
         min: 0,
         max: 30,
         step: 1,
       })
-      .on('change', (ev) => {
-        this.scene.remove(this.mesh);
-        this.mesh = this.tileGenerator.getTileMesh(parameters);
-        this.scene.add(this.mesh);
-      });
+      .on('change', rebuildMesh);
   }
 
   public update() {

@@ -55,7 +55,7 @@ export function createGradientTexture(
       a: number;
     };
   }>,
-  resolution: number = 256
+  resolution: number = 256 * 2
 ): THREE.DataTexture {
   const canvas = document.createElement('canvas');
   canvas.width = resolution;

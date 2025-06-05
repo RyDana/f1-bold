@@ -35,7 +35,7 @@ export type RemappedParams = {
 
 const parameters = autoSaveToLocalStorage('parameters', {
   ...defaultSettings,
-  ...JSON.parse(localStorage.getItem('parameters') ?? '{}'),
+  ...JSON.parse(localStorage.getItem('parameters-bold') ?? '{}'),
 });
 
 export default class MainScene {

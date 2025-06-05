@@ -33,7 +33,7 @@ export type RemappedParams = {
   [K in keyof Params]: { value: Params[K] };
 };
 
-const parameters = autoSaveToLocalStorage('parameters', {
+const parameters = autoSaveToLocalStorage('parameters-bold', {
   ...defaultSettings,
   ...JSON.parse(localStorage.getItem('parameters-bold') ?? '{}'),
 });

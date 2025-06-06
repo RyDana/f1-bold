@@ -54,7 +54,7 @@ export default class MainScene {
   private aspectRatio: number = 1;
   private mesh: THREE.Mesh;
   private pane = new Pane();
-  tileGenerator: TileGenerator;
+  private tileGenerator: TileGenerator;
 
   constructor(
     private dimensions: THREE.Vector2,

@@ -145,7 +145,7 @@ export class TileGenerator {
     ];
 
     divisionProbabilities = divisionProbabilities.filter(
-      ([probability]) => probability > 0
+      ([probability]) => probability > 0.00001
     );
 
     let tiles: Tile[] = [

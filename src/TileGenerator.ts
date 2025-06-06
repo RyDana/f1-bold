@@ -27,6 +27,14 @@ export type Tile = {
   direction: GradientDirection;
 };
 
+enum DivisionTypes {
+  NONE,
+  CONCENTRIC,
+  UNEQUAL_THIRDS,
+  UNEQUAL_HALVES,
+  REGULAR,
+}
+
 export type TileMesh = THREE.InstancedMesh<THREE.PlaneGeometry, TileMaterial>;
 
 export class TileGenerator {
@@ -122,6 +130,24 @@ export class TileGenerator {
     divisionRange: { min: number; max: number },
     concentricRange: { min: number; max: number }
   ): Tile[] {
+    let divisionProbabilities: [number, DivisionTypes][] = [
+      [this.parameters.probTileNone * 10, DivisionTypes.NONE],
+      [this.parameters.probTileConcentric * 10, DivisionTypes.CONCENTRIC],
+      [
+        this.parameters.probTileUnequalThirds * 10,
+        DivisionTypes.UNEQUAL_THIRDS,
+      ],
+      [
+        this.parameters.probTileUnequalHalves * 10,
+        DivisionTypes.UNEQUAL_HALVES,
+      ],
+      [this.parameters.probTileEven * 10, DivisionTypes.REGULAR],
+    ];
+
+    divisionProbabilities = divisionProbabilities.filter(
+      ([probability]) => probability > 0
+    );
+
     let tiles: Tile[] = [
       {
         direction: GradientDirection.UP,
@@ -134,179 +160,102 @@ export class TileGenerator {
     ];
 
     for (let i = 1; i <= interactionRange.max; i++) {
-      //split the tile vertically or horizontally
       const newTiles: Tile[] = [];
+
       for (let j = 0; j < tiles.length; j++) {
         const tile = tiles[j];
+
+        // if the tile is not at the current level, skip it
         if (tile.level !== i - 1) {
           newTiles.push(tile);
           continue;
         }
 
-        if (
-          chance(this.parameters.skipDivisionChance) &&
+        let allowedDivisionTypes: [number, DivisionTypes][] =
           i > interactionRange.min
-        ) {
+            ? divisionProbabilities
+            : divisionProbabilities.filter(([, type]) => {
+                return (
+                  type !== DivisionTypes.NONE &&
+                  type !== DivisionTypes.CONCENTRIC
+                );
+              });
+
+        let divisionType =
+          allowedDivisionTypes.length > 0
+            ? randomCandidate(allowedDivisionTypes)[1]
+            : DivisionTypes.REGULAR;
+
+        if (divisionType === DivisionTypes.NONE) {
           newTiles.push(tile);
           continue;
         }
 
-        if (
-          chance(this.parameters.concentricChance) &&
-          i > interactionRange.min
-        ) {
-          const concentric = this.concentricTile(
-            tile,
-            randomInt(concentricRange.min, concentricRange.max + 1)
-          );
+        if (divisionType === DivisionTypes.CONCENTRIC) {
+          const concentric = this.concentricTile(tile);
           if (concentric !== null) {
             newTiles.push(...concentric);
             continue;
+          } else {
+            allowedDivisionTypes = allowedDivisionTypes.filter(
+              ([, type]) => type !== DivisionTypes.CONCENTRIC
+            );
+            divisionType = randomCandidate(allowedDivisionTypes)[1];
           }
         }
 
         //chose how many divisions
         const divisions = randomInt(divisionRange.min, divisionRange.max + 1);
 
-        if (
-          chance(this.parameters.unequalThirdsChance) &&
-          divisions === 3 &&
-          i <= 2
-        ) {
-          //choose direction to split
-          const direction = tile.width > tile.height ? 'width' : 'height';
-          const sectionDim = tile[direction] / 4;
-          const newTileDims = [sectionDim, sectionDim * 2, sectionDim];
-
-          let newX = tile.x;
-          let newY = tile.y;
-          const dir =
-            tile.width > tile.height
-              ? randomCandidate([
-                  GradientDirection.RIGHT,
-                  GradientDirection.LEFT,
-                ])
-              : randomCandidate([GradientDirection.DOWN, GradientDirection.UP]);
-
-          for (let k = 0; k < newTileDims.length; k++) {
-            const width = direction === 'width' ? newTileDims[k] : tile.width;
-            const height =
-              direction === 'height' ? newTileDims[k] : tile.height;
-
-            const newTile: Tile = {
-              direction: dir,
-              level: i,
-              x: newX,
-              y: newY,
-              width,
-              height,
-            };
-            newX += direction === 'width' ? newTileDims[k] : 0;
-            newY += direction === 'height' ? newTileDims[k] : 0;
-            newTiles.push(newTile);
+        if (i <= 2) {
+          if (divisions === 2) {
+            allowedDivisionTypes = allowedDivisionTypes.filter(
+              ([, type]) => type !== DivisionTypes.UNEQUAL_THIRDS
+            );
           }
-          continue;
-        }
-
-        if (
-          chance(this.parameters.unequalHalvesChance) &&
-          divisions === 2 &&
-          i <= 2
-        ) {
-          //choose direction to split
-          const direction = tile.width > tile.height ? 'width' : 'height';
-          const sectionDim = tile[direction] / 3;
-          const newTileDims = shuffleArray([sectionDim, sectionDim * 2]);
-
-          let newX = tile.x;
-          let newY = tile.y;
-
-          let dir = tile.direction;
-
-          for (let k = 0; k < newTileDims.length; k++) {
-            const width = direction === 'width' ? newTileDims[k] : tile.width;
-            const height =
-              direction === 'height' ? newTileDims[k] : tile.height;
-            if (
-              width > height &&
-              [GradientDirection.UP, GradientDirection.DOWN].includes(dir)
-            ) {
-              dir = randomCandidate([
-                GradientDirection.RIGHT,
-                GradientDirection.LEFT,
-              ]);
-            } else if (
-              height > width &&
-              [GradientDirection.LEFT, GradientDirection.RIGHT].includes(dir)
-            ) {
-              dir = randomCandidate([
-                GradientDirection.DOWN,
-                GradientDirection.UP,
-              ]);
-            }
-
-            const newTile: Tile = {
-              direction: dir,
-              level: i,
-              x: newX,
-              y: newY,
-              width,
-              height,
-            };
-            newX += direction === 'width' ? newTileDims[k] : 0;
-            newY += direction === 'height' ? newTileDims[k] : 0;
-            newTiles.push(newTile);
+          if (divisions === 3) {
+            allowedDivisionTypes = allowedDivisionTypes.filter(
+              ([, type]) => type !== DivisionTypes.UNEQUAL_HALVES
+            );
           }
-          continue;
+        } else {
+          allowedDivisionTypes = allowedDivisionTypes.filter(
+            ([, type]) =>
+              type !== DivisionTypes.UNEQUAL_THIRDS &&
+              type !== DivisionTypes.UNEQUAL_HALVES
+          );
         }
 
-        //choose direction to split
-        let direction: 'width' | 'height' = chance(0.5) ? 'width' : 'height';
+        divisionType =
+          allowedDivisionTypes.length > 0
+            ? randomCandidate(allowedDivisionTypes)[1]
+            : DivisionTypes.REGULAR;
 
-        //create new tile
-        let newTileDim = tile[direction] / divisions;
-        if (
-          newTileDim <
-          this.sceneDimensions.x * this.parameters.thinnestTileSize
-        ) {
-          direction = direction === 'width' ? 'height' : 'width';
-          newTileDim = tile[direction] / divisions;
+        if (divisionType === DivisionTypes.UNEQUAL_THIRDS) {
+          const thirds = this.unevenThirdsTile(tile, i);
+          if (thirds !== null) {
+            newTiles.push(...thirds);
+            continue;
+          }
         }
 
-        if (
-          newTileDim <
-          this.sceneDimensions.x * this.parameters.thinnestTileSize
-        ) {
-          newTiles.push(tile);
-          continue;
+        if (divisionType === DivisionTypes.UNEQUAL_HALVES) {
+          const halves = this.unevenHalvesTile(tile, i);
+          if (halves !== null) {
+            newTiles.push(...halves);
+            continue;
+          }
         }
 
-        tile[direction] = newTileDim;
-        tile.level = i;
-        const genDir = randomCandidate([
-          GradientDirection.DOWN,
-          GradientDirection.UP,
-        ]);
-        for (let k = 0; k < divisions; k++) {
-          const width = direction === 'width' ? newTileDim : tile.width;
-          const height = direction === 'height' ? newTileDim : tile.height;
-          const dir =
-            width > height
-              ? [GradientDirection.RIGHT, GradientDirection.LEFT][k % 2]
-              : direction === 'height'
-              ? genDir
-              : [GradientDirection.DOWN, GradientDirection.UP][k % 2];
-
-          const newTile: Tile = {
-            direction: dir,
-            level: i,
-            x: tile.x + (direction === 'width' ? newTileDim * k : 0),
-            y: tile.y + (direction === 'height' ? newTileDim * k : 0),
-            width,
-            height,
-          };
-          newTiles.push(newTile);
+        if (divisionType === DivisionTypes.REGULAR) {
+          const regular = this.regularSplitTile(tile, i, divisions);
+          if (regular !== null) {
+            newTiles.push(...regular);
+            continue;
+          }
         }
+
+        newTiles.push(tile);
       }
       tiles = newTiles;
     }
@@ -314,32 +263,161 @@ export class TileGenerator {
     return tiles;
   }
 
-  private concentricTile(tile: Tile, number: number): Tile[] | null {
+  private regularSplitTile(
+    tile: Tile,
+    level: number,
+    divisions: number
+  ): Tile[] | null {
+    const newTiles: Tile[] = [];
+
+    //choose direction to split
+    let direction: 'width' | 'height' = chance(0.5) ? 'width' : 'height';
+
+    //create new tile
+    let newTileDim = tile[direction] / divisions;
+    if (
+      newTileDim <
+      this.sceneDimensions.x * this.parameters.thinnestTileSize
+    ) {
+      direction = direction === 'width' ? 'height' : 'width';
+      newTileDim = tile[direction] / divisions;
+    }
+
+    if (
+      newTileDim <
+      this.sceneDimensions.x * this.parameters.thinnestTileSize
+    ) {
+      return null;
+    }
+
+    tile[direction] = newTileDim;
+    tile.level = level;
+    const genDir = randomCandidate([
+      GradientDirection.DOWN,
+      GradientDirection.UP,
+    ]);
+    for (let k = 0; k < divisions; k++) {
+      const width = direction === 'width' ? newTileDim : tile.width;
+      const height = direction === 'height' ? newTileDim : tile.height;
+      const dir =
+        width > height
+          ? [GradientDirection.RIGHT, GradientDirection.LEFT][k % 2]
+          : direction === 'height'
+          ? genDir
+          : [GradientDirection.DOWN, GradientDirection.UP][k % 2];
+
+      const newTile: Tile = {
+        direction: dir,
+        level: level,
+        x: tile.x + (direction === 'width' ? newTileDim * k : 0),
+        y: tile.y + (direction === 'height' ? newTileDim * k : 0),
+        width,
+        height,
+      };
+      newTiles.push(newTile);
+    }
+    return newTiles;
+  }
+
+  private unevenHalvesTile(tile: Tile, level: number): Tile[] | null {
+    const newTiles: Tile[] = [];
+    const direction = tile.width > tile.height ? 'width' : 'height';
+    const sectionDim = tile[direction] / 3;
+    const newTileDims = shuffleArray([sectionDim, sectionDim * 2]);
+
+    let newX = tile.x;
+    let newY = tile.y;
+
+    let dir = tile.direction;
+
+    for (let k = 0; k < newTileDims.length; k++) {
+      const width = direction === 'width' ? newTileDims[k] : tile.width;
+      const height = direction === 'height' ? newTileDims[k] : tile.height;
+      if (
+        width > height &&
+        [GradientDirection.UP, GradientDirection.DOWN].includes(dir)
+      ) {
+        dir = randomCandidate([
+          GradientDirection.RIGHT,
+          GradientDirection.LEFT,
+        ]);
+      } else if (
+        height > width &&
+        [GradientDirection.LEFT, GradientDirection.RIGHT].includes(dir)
+      ) {
+        dir = randomCandidate([GradientDirection.DOWN, GradientDirection.UP]);
+      }
+
+      const newTile: Tile = {
+        direction: dir,
+        level,
+        x: newX,
+        y: newY,
+        width,
+        height,
+      };
+      newX += direction === 'width' ? newTileDims[k] : 0;
+      newY += direction === 'height' ? newTileDims[k] : 0;
+      newTiles.push(newTile);
+    }
+    return newTiles;
+  }
+
+  private unevenThirdsTile(tile: Tile, level: number): Tile[] | null {
+    const newTiles: Tile[] = [];
+    const direction = tile.width > tile.height ? 'width' : 'height';
+    const sectionDim = tile[direction] / 4;
+    const newTileDims = [sectionDim, sectionDim * 2, sectionDim];
+
+    let newX = tile.x;
+    let newY = tile.y;
+    const dir =
+      tile.width > tile.height
+        ? randomCandidate([GradientDirection.RIGHT, GradientDirection.LEFT])
+        : randomCandidate([GradientDirection.DOWN, GradientDirection.UP]);
+
+    for (let k = 0; k < newTileDims.length; k++) {
+      const width = direction === 'width' ? newTileDims[k] : tile.width;
+      const height = direction === 'height' ? newTileDims[k] : tile.height;
+
+      const newTile: Tile = {
+        direction: dir,
+        level,
+        x: newX,
+        y: newY,
+        width,
+        height,
+      };
+      newX += direction === 'width' ? newTileDims[k] : 0;
+      newY += direction === 'height' ? newTileDims[k] : 0;
+      newTiles.push(newTile);
+    }
+
+    return newTiles;
+  }
+
+  private concentricTile(tile: Tile): Tile[] | null {
     const tiles: Tile[] = [];
     tiles.push(tile);
 
     //Try how many concentric tiles could fit
-    let step = 0;
-    let divisions = 0;
-    for (
-      let i = this.parameters.concentricRange.max;
-      i >= this.parameters.concentricRange.min;
-      i--
-    ) {
-      step = Math.min(tile.height, tile.width) / 2 / i;
-      if (step >= this.sceneDimensions.x * this.parameters.thinnestTileSize) {
-        divisions = i;
-        break;
-      }
+    let step = this.sceneDimensions.x * this.parameters.thinnestTileSize;
+    let divisions = Math.min(tile.height, tile.width) / step / 2;
+    if (divisions > this.parameters.concentricRange.max) {
+      divisions = this.parameters.concentricRange.max;
     }
-    if (divisions === 0) {
-      return null;
-    }
-
-    // const step =
-    //   (tile.width > tile.height ? tile.height : tile.width) / 2 / (number + 1);
-    // if (step < this.sceneDimensions.x * this.parameters.thinnestTileSize)
-    //   return null;
+    // for (
+    //   let i = this.parameters.concentricRange.max;
+    //   i >= this.parameters.concentricRange.min;
+    //   i--
+    // ) {
+    //   step = Math.min(tile.height, tile.width) / 2 / i;
+    //   if (step >= this.sceneDimensions.x * this.parameters.thinnestTileSize) {
+    //     divisions = i;
+    //     break;
+    //   }
+    // }
+    if (divisions === 0) return null;
 
     const dirFactoryGenerator = randomCandidate([
       (dirs: GradientDirection[]) => (index: number) =>

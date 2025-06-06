@@ -27,14 +27,15 @@ const defaultSettings = {
   uSpeed: 0.1,
   uAsyncPos: 0.0,
   uAsyncSpeed: 0.1,
-  skipDivisionChance: 0.5,
   iterationRange: { min: 1, max: 4 },
   divisionRange: { min: 2, max: 8 },
   concentricRange: { min: 5, max: 8 },
   thinnestTileSize: 0.1,
-  unequalThirdsChance: 0.5,
-  unequalHalvesChance: 0.5,
-  concentricChance: 0.5,
+  probTileNone: 0.5,
+  probTileConcentric: 0.5,
+  probTileUnequalHalves: 0.5,
+  probTileUnequalThirds: 0.5,
+  probTileEven: 0.5,
 };
 
 export type Params = typeof defaultSettings;
@@ -211,6 +212,7 @@ export default class MainScene {
         label: 'Thinnest Tile Size',
         min: 0,
         max: 1,
+        step: 0.001,
       })
       .on('change', rebuildMesh);
 
@@ -223,28 +225,57 @@ export default class MainScene {
       })
       .on('change', rebuildMesh);
 
-    const tilingTabs = tilingFolder.addTab({
-      pages: [{ title: 'None' }, { title: 'Concentric' }],
+    const tilingProbFolder = tilingFolder.addFolder({
+      title: 'Tiling Probabilities',
+      expanded: true,
     });
-
-    const tilingTabs2 = tilingFolder.addTab({
-      pages: [{ title: 'Halves' }, { title: 'Thirds' }, { title: 'Even' }],
-    });
-
-    const noneTab = tilingTabs.pages[0];
-    const concentricTab = tilingTabs.pages[1];
-    const unequalHalvesTab = tilingTabs2.pages[0];
-    const unequalThirdsTab = tilingTabs2.pages[1];
-    const evenTab = tilingTabs2.pages[2];
-
-    noneTab
-      .addBinding(parameters, 'skipDivisionChance', {
-        label: 'chance',
+    tilingProbFolder
+      .addBinding(parameters, 'probTileNone', {
+        label: 'None',
         min: 0,
         max: 1,
-        step: 0.01,
+        step: 0.001,
       })
       .on('change', rebuildMesh);
+    tilingProbFolder
+      .addBinding(parameters, 'probTileConcentric', {
+        label: 'Concentric',
+        min: 0,
+        max: 1,
+        step: 0.001,
+      })
+      .on('change', rebuildMesh);
+    tilingProbFolder
+      .addBinding(parameters, 'probTileUnequalHalves', {
+        label: 'Unequal Halves',
+        min: 0,
+        max: 1,
+        step: 0.001,
+      })
+      .on('change', rebuildMesh);
+    tilingProbFolder
+      .addBinding(parameters, 'probTileUnequalThirds', {
+        label: 'Unequal Thirds',
+        min: 0,
+        max: 1,
+        step: 0.001,
+      })
+      .on('change', rebuildMesh);
+    tilingProbFolder
+      .addBinding(parameters, 'probTileEven', {
+        label: 'Even',
+        min: 0,
+        max: 1,
+        step: 0.001,
+      })
+      .on('change', rebuildMesh);
+
+    const tilingTabs = tilingFolder.addTab({
+      pages: [{ title: 'Even' }, { title: 'Concentric' }],
+    });
+
+    const evenTab = tilingTabs.pages[0];
+    const concentricTab = tilingTabs.pages[1];
 
     evenTab
       .addBinding(parameters, 'divisionRange', {
@@ -252,32 +283,6 @@ export default class MainScene {
         min: 0,
         max: 30,
         step: 1,
-      })
-      .on('change', rebuildMesh);
-
-    unequalThirdsTab
-      .addBinding(parameters, 'unequalThirdsChance', {
-        label: 'Chance',
-        min: 0,
-        max: 1,
-        step: 0.01,
-      })
-      .on('change', rebuildMesh);
-    unequalHalvesTab
-      .addBinding(parameters, 'unequalHalvesChance', {
-        label: 'Chance',
-        min: 0,
-        max: 1,
-        step: 0.01,
-      })
-      .on('change', rebuildMesh);
-
-    concentricTab
-      .addBinding(parameters, 'concentricChance', {
-        label: 'Chance',
-        min: 0,
-        max: 1,
-        step: 0.01,
       })
       .on('change', rebuildMesh);
 
